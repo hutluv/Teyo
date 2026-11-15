@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Teyo IA</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body, html { width: 100%; height: 100%; background: #0f0f0f; overflow: hidden; font-family: sans-serif; }
+    iframe { width: 100%; height: 100%; border: none; display: none; }
+    #estado {
+      position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; color: #fff; text-align: center; padding: 20px;
+    }
+    .spinner {
+      width: 36px; height: 36px; border: 3px solid #333; border-top-color: #ff7b00;
+      border-radius: 50%; animation: girar 0.8s linear infinite; margin-bottom: 15px;
+    }
+    @keyframes girar { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="estado">
+    <div class="spinner"></div>
+    <p id="texto-estado">Conectando con Teyo IA...</p>
+  </div>
+  <iframe id="visor" allow="microphone; camera; clipboard-read; clipboard-write"></iframe>
+
+  <script>
+    const CANAL = "teyo_mi_canal_99";
+    let urlActual = "";
+
+    async function conectarServidor() {
+      const texto = document.getElementById("texto-estado");
+      const visor = document.getElementById("visor");
+      const estado = document.getElementById("estado");
+
+      if (!navigator.onLine) {
+        visor.style.display = "none";
+        estado.style.display = "flex";
+        texto.innerText = "Sin internet en el teléfono. Esperando señal...";
+        setTimeout(conectarServidor, 3000);
+        return;
+      }
+
+      try {
+        // Pide el último mensaje en texto plano puro (/raw)
+        const res = await fetch(`https://ntfy.sh{CANAL}/raw?poll=1`, { cache: "no-store" });
+        const raw = await res.text();
+        const lineas = raw.trim().split("\n").map(l => l.trim()).filter(l => l.startsWith("https://"));
+
+        if (lineas.length === 0) {
+          texto.innerText = "Esperando que Termux envíe el link...";
+          setTimeout(conectarServidor, 3000);
+          return;
+        }
+
+        const nuevoLink = lineas[lineas.length - 1];
+
+        if (nuevoLink !== urlActual) {
+          urlActual = nuevoLink;
+          visor.src = urlActual;
+        }
+        visor.style.display = "block";
+        estado.style.display = "none";
+      } catch (e) {
+        texto.innerText = "Buscando servidor de Termux...";
+        setTimeout(conectarServidor, 3000);
+      }
+    }
+
+    window.addEventListener("online", conectarServidor);
+    window.addEventListener("offline", () => {
+      document.getElementById("visor").style.display = "none";
+      document.getElementById("estado").style.display = "flex";
+      document.getElementById("texto-estado").innerText = "Se cortó el internet. Esperando señal...";
+    });
+
+    setInterval(conectarServidor, 10000);
+    conectarServidor();
+  </script>
+</body>
+</html>
